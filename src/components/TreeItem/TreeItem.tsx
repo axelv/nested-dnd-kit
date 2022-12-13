@@ -66,7 +66,7 @@ export const TreeItem = forwardRef<HTMLDivElement, Props>(
     return (
       <li
         className={classNames("list-none box-border -mb-px", {
-          "inline-block pointer-events-none p-0 pl-2.5 pt-[5px]": clone,
+          "inline-block pointer-events-none p-0 pl-[10px] pt-[5px]": clone,
           "opacity-100 relative z-10 -mb-px": ghost && indicator,
           "opacity-50": ghost && !indicator,
           "pointer-events-none": disableInteraction,
@@ -74,7 +74,7 @@ export const TreeItem = forwardRef<HTMLDivElement, Props>(
         ref={wrapperRef}
         style={
           {
-            paddingLeft: `${indentationWidth * depth}px`,
+            paddingLeft: clone ? undefined : `${indentationWidth * depth}px`,
           } as React.CSSProperties
         }
         {...props}
@@ -83,7 +83,7 @@ export const TreeItem = forwardRef<HTMLDivElement, Props>(
           className={classNames(
             "relative flex items-center p-2.5 bg-white border border-gray-300 text-gray-700 box-border",
             {
-              "pr-6 rounded-[4px] shadow-md py-[5px]": clone,
+              "pr-6 rounded-[4px] shadow-md !py-[5px]": clone,
               "!p-0 !h-1.5 border-blue-500 bg-blue-300":
                 ghost && indicator,
               "before:absolute before:-left-2 before:-top-1 before:block before:content-[''] before:w-3 before:h-3 before:bg-white before:rounded-full before:border before:border-blue-500":

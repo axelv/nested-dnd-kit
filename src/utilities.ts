@@ -1,5 +1,6 @@
 import type { UniqueIdentifier } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
+import { create, string } from 'superstruct';
 
 import type { FlattenedItem, TreeItem, TreeItems } from './types';
 
@@ -11,13 +12,13 @@ function getDragDepth(offset: number, indentationWidth: number) {
 
 export function getProjection(
   items: FlattenedItem[],
-  activeId: UniqueIdentifier,
-  overId: UniqueIdentifier,
+  activePathString: string,
+  overPathString: string,
   dragOffset: number,
   indentationWidth: number
 ) {
-  const overItemIndex = items.findIndex(({ id }) => id === overId);
-  const activeItemIndex = items.findIndex(({ id }) => id === activeId);
+  const overItemIndex = items.findIndex(({ path }) => JSON.stringify(path) === overPathString);
+  const activeItemIndex = items.findIndex(({ path }) => JSON.stringify(path) === activePathString);
   const activeItem = items[activeItemIndex];
   const newItems = arrayMove(items, activeItemIndex, overItemIndex);
   const previousItem = newItems[overItemIndex - 1];
@@ -35,26 +36,25 @@ export function getProjection(
   } else if (projectedDepth < minDepth) {
     depth = minDepth;
   }
+  return { depth, maxDepth, minDepth, parentPathString: getParentPathString() };
 
-  return { depth, maxDepth, minDepth, parentId: getParentId() };
-
-  function getParentId() {
+  function getParentPathString() {
     if (depth === 0 || !previousItem) {
       return null;
     }
 
     if (depth === previousItem.depth) {
-      return previousItem.parentId;
+      return previousItem.parentPathString;
     }
 
     if (depth > previousItem.depth) {
-      return previousItem.id;
+      return previousItem.pathString;
     }
 
     const newParent = newItems
       .slice(0, overItemIndex)
       .reverse()
-      .find((item) => item.depth === depth)?.parentId;
+      .find((item) => item.depth === depth)?.parentPathString;
 
     return newParent ?? null;
   }
@@ -78,14 +78,17 @@ function getMinDepth({ nextItem }: { nextItem: FlattenedItem }) {
 
 function flatten(
   items: TreeItems,
-  parentId: UniqueIdentifier | null = null,
-  depth = 0
+  parentPathString: string | null = null,
+  depth = 0,
+  path: string[] = []
 ): FlattenedItem[] {
   return items.reduce<FlattenedItem[]>((acc, item, index) => {
+    const newPath = [...path, create(item.id, string())]
+    const pathString = JSON.stringify(newPath)
     return [
       ...acc,
-      { ...item, parentId, depth, index },
-      ...flatten(item.children, item.id, depth + 1),
+      { ...item, parentPathString, depth, index, path: newPath, pathString },
+      ...flatten(item.children, pathString, depth + 1, newPath),
     ];
   }, []);
 }
@@ -96,15 +99,16 @@ export function flattenTree(items: TreeItems): FlattenedItem[] {
 
 export function buildTree(flattenedItems: FlattenedItem[]): TreeItems {
   const root: TreeItem = { id: 'root', children: [] };
-  const nodes: Record<string, TreeItem> = { [root.id]: root };
+  const rootPathString = JSON.stringify([root.id]);
+  const nodes: Record<string, TreeItem> = { [rootPathString]: root };
   const items = flattenedItems.map((item) => ({ ...item, children: [] }));
 
   for (const item of items) {
-    const { id, children } = item;
-    const parentId = item.parentId ?? root.id;
-    const parent = nodes[parentId] ?? findItem(items, parentId);
+    const { id, pathString, children } = item;
+    const parentPathString = item.parentPathString ?? rootPathString;
+    const parent = nodes[parentPathString] ?? findItem(items, parentPathString);
 
-    nodes[id] = { id, children };
+    nodes[pathString] = { id, children };
     parent.children.push(item);
   }
 
@@ -117,21 +121,15 @@ export function findItem(items: TreeItem[], itemId: UniqueIdentifier) {
 
 export function findItemDeep(
   items: TreeItems,
-  itemId: UniqueIdentifier
+  path: UniqueIdentifier[]
 ): TreeItem | undefined {
   for (const item of items) {
     const { id, children } = item;
-
-    if (id === itemId) {
-      return item;
-    }
-
-    if (children.length) {
-      const child = findItemDeep(children, itemId);
-
-      if (child) {
-        return child;
+    if (id === path[0]) {
+      if (path.length > 1) {
+        return findItemDeep(children, path.slice(1));
       }
+      return item;
     }
   }
 
@@ -186,22 +184,22 @@ function countChildren(items: TreeItem[], count = 0): number {
   }, count);
 }
 
-export function getChildCount(items: TreeItems, id: UniqueIdentifier) {
-  const item = findItemDeep(items, id);
+export function getChildCount(items: TreeItems, path: UniqueIdentifier[]) {
+  const item = findItemDeep(items, path);
 
   return item ? countChildren(item.children) : 0;
 }
 
 export function removeChildrenOf(
   items: FlattenedItem[],
-  ids: UniqueIdentifier[]
+  pathStrings: string[]
 ) {
-  const excludeParentIds = [...ids];
+  const excludeParentPathStrings = [...pathStrings];
 
   return items.filter((item) => {
-    if (item.parentId && excludeParentIds.includes(item.parentId)) {
+    if (item.parentPathString && excludeParentPathStrings.includes(item.parentPathString)) {
       if (item.children.length) {
-        excludeParentIds.push(item.id);
+        excludeParentPathStrings.push(item.pathString);
       }
       return false;
     }

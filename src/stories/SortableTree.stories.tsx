@@ -22,10 +22,11 @@ NonUnique.args = {
                 { id: 'Summer', children: [], },
                 { id: 'Fall', children: [], },
                 { id: 'Winter', children: [], },
+                { id: "Home", children: [], },
             ],
         },
         {
-            id: 'Home',
+            id: 'About Us',
             children: [],
         },
         {

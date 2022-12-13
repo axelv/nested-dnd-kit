@@ -11,9 +11,11 @@ export interface TreeItem {
 export type TreeItems = TreeItem[];
 
 export interface FlattenedItem extends TreeItem {
-  parentId: UniqueIdentifier | null;
+  parentPathString: string | null
   depth: number;
   index: number;
+  path: UniqueIdentifier[];
+  pathString: string;
 }
 
 export type SensorContext = MutableRefObject<{
