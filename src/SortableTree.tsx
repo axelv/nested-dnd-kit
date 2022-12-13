@@ -95,7 +95,7 @@ const dropAnimationConfig: DropAnimation = {
   },
 };
 
-interface Props {
+export interface Props {
   collapsible?: boolean;
   defaultItems?: TreeItems;
   indentationWidth?: number;
