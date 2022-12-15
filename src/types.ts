@@ -1,24 +1,25 @@
 import type { MutableRefObject } from 'react';
-import type { UniqueIdentifier } from '@dnd-kit/core';
+import { IQuestion } from './components/TreeItem/SortableTreeQuestion';
+import { IRow } from './SortableAnswerRows';
 
-export interface TreeItem {
-  id: UniqueIdentifier;
-  children: TreeItem[];
+export interface IQuestionItem extends IQuestion {
+  id: string;
+  children: IQuestionItem[];
   collapsed?: boolean;
-  items?: []
+  rows?: IRow[]
 }
 
-export type TreeItems = TreeItem[];
+export type IQuestionTree = IQuestionItem[];
 
-export interface FlattenedItem extends TreeItem {
+export interface IFlattenedQuestion extends IQuestionItem {
   parentPathString: string | null
   depth: number;
   index: number;
-  path: UniqueIdentifier[];
+  path: string[];
   pathString: string;
 }
 
 export type SensorContext = MutableRefObject<{
-  items: FlattenedItem[];
+  items: IFlattenedQuestion[];
   offset: number;
 }>;

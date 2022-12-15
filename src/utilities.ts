@@ -2,7 +2,7 @@ import type { UniqueIdentifier } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { create, string } from 'superstruct';
 
-import type { FlattenedItem, TreeItem, TreeItems } from './types';
+import type { IFlattenedQuestion, IQuestionItem, IQuestionTree } from './types';
 
 export const iOS = /iPad|iPhone|iPod/.test(navigator.platform);
 
@@ -11,15 +11,16 @@ function getDragDepth(offset: number, indentationWidth: number) {
 }
 
 export function getProjection(
-  items: FlattenedItem[],
+  items: IFlattenedQuestion[],
   activePathString: string,
   overPathString: string,
   dragOffset: number,
   indentationWidth: number
 ) {
-  const overItemIndex = items.findIndex(({ path }) => JSON.stringify(path) === overPathString);
-  const activeItemIndex = items.findIndex(({ path }) => JSON.stringify(path) === activePathString);
+  const overItemIndex = items.findIndex(({ pathString }) => pathString === overPathString);
+  const activeItemIndex = items.findIndex(({ pathString }) => pathString === activePathString);
   const activeItem = items[activeItemIndex];
+  // check for path collision with active item
   const newItems = arrayMove(items, activeItemIndex, overItemIndex);
   const previousItem = newItems[overItemIndex - 1];
   const nextItem = newItems[overItemIndex + 1];
@@ -36,7 +37,7 @@ export function getProjection(
   } else if (projectedDepth < minDepth) {
     depth = minDepth;
   }
-  return { depth, maxDepth, minDepth, parentPathString: getParentPathString() };
+  return { depth, maxDepth, minDepth, parentPathString: getParentPathString(), allowed: getAllowed() };
 
   function getParentPathString() {
     if (depth === 0 || !previousItem) {
@@ -58,9 +59,12 @@ export function getProjection(
 
     return newParent ?? null;
   }
+  function getAllowed() {
+    return items.filter(item => item.id === activeItem.id && item.parentPathString === getParentPathString() && item.parentPathString !== activeItem.parentPathString).length == 0
+  }
 }
 
-function getMaxDepth({ previousItem }: { previousItem: FlattenedItem }) {
+function getMaxDepth({ previousItem }: { previousItem: IFlattenedQuestion }) {
   if (previousItem) {
     return previousItem.depth + 1;
   }
@@ -68,7 +72,7 @@ function getMaxDepth({ previousItem }: { previousItem: FlattenedItem }) {
   return 0;
 }
 
-function getMinDepth({ nextItem }: { nextItem: FlattenedItem }) {
+function getMinDepth({ nextItem }: { nextItem: IFlattenedQuestion }) {
   if (nextItem) {
     return nextItem.depth;
   }
@@ -77,12 +81,12 @@ function getMinDepth({ nextItem }: { nextItem: FlattenedItem }) {
 }
 
 function flatten(
-  items: TreeItems,
+  items: IQuestionTree,
   parentPathString: string | null = null,
   depth = 0,
   path: string[] = []
-): FlattenedItem[] {
-  return items.reduce<FlattenedItem[]>((acc, item, index) => {
+): IFlattenedQuestion[] {
+  return items.reduce<IFlattenedQuestion[]>((acc, item, index) => {
     const newPath = [...path, create(item.id, string())]
     const pathString = JSON.stringify(newPath)
     return [
@@ -93,36 +97,33 @@ function flatten(
   }, []);
 }
 
-export function flattenTree(items: TreeItems): FlattenedItem[] {
+export function flattenTree(items: IQuestionTree): IFlattenedQuestion[] {
   return flatten(items);
 }
 
-export function buildTree(flattenedItems: FlattenedItem[]): TreeItems {
-  const root: TreeItem = { id: 'root', children: [] };
+export function buildTree(flattenedItems: IFlattenedQuestion[]): IQuestionTree {
+  const root: IQuestionItem = { id: 'root', children: [], render: () => "root" };
   const rootPathString = JSON.stringify([root.id]);
-  const nodes: Record<string, TreeItem> = { [rootPathString]: root };
+  const nodes: Record<string, IQuestionItem> = { [rootPathString]: root };
   const items = flattenedItems.map((item) => ({ ...item, children: [] }));
 
   for (const item of items) {
-    const { id, pathString, children } = item;
+    const { id, pathString, children, rows, render } = item;
     const parentPathString = item.parentPathString ?? rootPathString;
-    const parent = nodes[parentPathString] ?? findItem(items, parentPathString);
+    const parent = nodes[parentPathString] ?? items.find(({ pathString }) => pathString === parentPathString);
 
-    nodes[pathString] = { id, children };
+    nodes[pathString] = { id, children, render, rows };
     parent.children.push(item);
   }
 
   return root.children;
 }
 
-export function findItem(items: TreeItem[], itemId: UniqueIdentifier) {
-  return items.find(({ id }) => id === itemId);
-}
 
 export function findItemDeep(
-  items: TreeItems,
+  items: IQuestionTree,
   path: UniqueIdentifier[]
-): TreeItem | undefined {
+): IQuestionItem | undefined {
   for (const item of items) {
     const { id, children } = item;
     if (id === path[0]) {
@@ -136,45 +137,43 @@ export function findItemDeep(
   return undefined;
 }
 
-export function removeItem(items: TreeItems, id: UniqueIdentifier) {
+export function removeItem(items: IQuestionTree, path: string[]) {
   const newItems = [];
-
+  if (path.length == 0) return []
   for (const item of items) {
-    if (item.id === id) {
-      continue;
+    if (item.id === path[0]) {
+      if (path.length == 1) {
+        continue
+      }
+      item.children = removeItem(item.children, path.slice(1))
     }
-
-    if (item.children.length) {
-      item.children = removeItem(item.children, id);
-    }
-
     newItems.push(item);
   }
 
   return newItems;
 }
 
-export function setProperty<T extends keyof TreeItem>(
-  items: TreeItems,
-  id: UniqueIdentifier,
+export function setProperty<T extends keyof IQuestionItem>(
+  items: IQuestionTree,
+  path: string[],
   property: T,
-  setter: (value: TreeItem[T]) => TreeItem[T]
+  setter: (value: IQuestionItem[T]) => IQuestionItem[T]
 ) {
+  if (path.length == 0) return items
   for (const item of items) {
-    if (item.id === id) {
+    if (item.id === path[0]) {
+      if (path.length > 1) {
+        item.children = setProperty(item.children, path.slice(1), property, setter);
+      }
       item[property] = setter(item[property]);
-      continue;
-    }
-
-    if (item.children.length) {
-      item.children = setProperty(item.children, id, property, setter);
+      break
     }
   }
 
   return [...items];
 }
 
-function countChildren(items: TreeItem[], count = 0): number {
+function countChildren(items: IQuestionItem[], count = 0): number {
   return items.reduce((acc, { children }) => {
     if (children.length) {
       return countChildren(children, acc + 1);
@@ -184,14 +183,14 @@ function countChildren(items: TreeItem[], count = 0): number {
   }, count);
 }
 
-export function getChildCount(items: TreeItems, path: UniqueIdentifier[]) {
+export function getChildCount(items: IQuestionTree, path: UniqueIdentifier[]) {
   const item = findItemDeep(items, path);
 
   return item ? countChildren(item.children) : 0;
 }
 
 export function removeChildrenOf(
-  items: FlattenedItem[],
+  items: IFlattenedQuestion[],
   pathStrings: string[]
 ) {
   const excludeParentPathStrings = [...pathStrings];

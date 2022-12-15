@@ -3,26 +3,8 @@ import classNames from "classnames";
 
 import { Action, Handle, Remove } from "../Item";
 import { Transition } from "@headlessui/react";
-import { SortableContext, useSortable } from "@dnd-kit/sortable";
-import { UniqueIdentifier } from "@dnd-kit/core";
-import { CSS } from "@dnd-kit/utilities";
 
-function SortableItem(props: React.HTMLAttributes<HTMLLIElement> & { id: UniqueIdentifier }) {
-  const { id, style, ...rest } = props
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id })
-  return (
-    <li
-      ref={setNodeRef}
-      {...attributes}
-      className="block list-none rounded border border-gray-300"
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      {...listeners}
-      {...rest}
-    />
-  )
-}
-
-export interface Props extends Omit<HTMLAttributes<HTMLLIElement>, "id" | "children"> {
+export interface Props extends Omit<HTMLAttributes<HTMLLIElement>, "id"> {
   childCount?: number;
   clone?: boolean;
   collapsed?: boolean;
@@ -34,10 +16,10 @@ export interface Props extends Omit<HTMLAttributes<HTMLLIElement>, "id" | "child
   indicator?: boolean;
   indentationWidth: number;
   value: string;
+  allowDrop?: boolean;
   onCollapse?(): void;
   onRemove?(): void;
   wrapperRef?(node: HTMLLIElement): void;
-  items: string[]
 }
 
 export const TreeItem = forwardRef<HTMLDivElement, Props>(
@@ -52,13 +34,14 @@ export const TreeItem = forwardRef<HTMLDivElement, Props>(
       handleProps,
       indentationWidth,
       indicator,
+      children,
       collapsed,
       onCollapse,
       onRemove,
       style,
       value,
       wrapperRef,
-      items,
+      allowDrop = true,
       ...props
     },
     ref
@@ -84,10 +67,14 @@ export const TreeItem = forwardRef<HTMLDivElement, Props>(
             "relative flex items-center p-2.5 bg-white border border-gray-300 text-gray-700 box-border",
             {
               "pr-6 rounded-[4px] shadow-md !py-[5px]": clone,
-              "!p-0 !h-1.5 border-blue-500 bg-blue-300":
+              "!p-0 !h-1.5":
                 ghost && indicator,
-              "before:absolute before:-left-2 before:-top-1 before:block before:content-[''] before:w-3 before:h-3 before:bg-white before:rounded-full before:border before:border-blue-500":
+              " border-blue-500 bg-blue-300": ghost && indicator && allowDrop,
+              "border-red-500 bg-red-300": ghost && indicator && !allowDrop,
+              "before:absolute before:-left-2 before:-top-1 before:block before:content-[''] before:w-3 before:h-3 before:bg-white before:rounded-full before:border":
                 ghost && indicator,
+              "before:border-blue-500": ghost && indicator && allowDrop,
+              "before:border-red-500": ghost && indicator && !allowDrop,
             }
           )}
           ref={ref}
@@ -145,15 +132,7 @@ export const TreeItem = forwardRef<HTMLDivElement, Props>(
                 ) : null}
               </div>
               <div>
-                {/**<SortableContext items={items}>
-                  <ul className="list-none">
-                    {items.map((item) => (
-                      <SortableItem id={item} key={item}>
-                        {item}
-                      </SortableItem>
-                    ))}
-                  </ul>
-                    </SortableContext>*/}
+                {children}
               </div>
             </div>
           </Transition>

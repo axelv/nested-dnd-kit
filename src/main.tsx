@@ -1,11 +1,19 @@
 import React from 'react'
-import ReactDOM from 'react-dom/client'
+import { createRoot } from 'react-dom/client'
+import Document from './Document'
 import './index.css'
-import { SortableTree } from './SortableTree'
+import Library, { LibraryDnDContext } from './Library'
 
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+const container = document.getElementById('root')
+const root = createRoot(container!);
+root.render(
   <React.StrictMode>
-    <SortableTree indicator collapsible removable />
-  </React.StrictMode>,
+    <div className='flex'>
+      <LibraryDnDContext>
+        <Document className='grow-[3]' />
+        <Library />
+      </LibraryDnDContext>
+    </div >
+  </React.StrictMode >,
 )
